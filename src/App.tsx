@@ -327,7 +327,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-black text-gray-100 font-sans selection:bg-teal-500/30">
+    <div className="flex flex-col h-full bg-black text-gray-100 font-sans selection:bg-teal-500/30">
       {/* Navbar */}
       <nav className="flex items-end justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-white/10 backdrop-blur-md bg-black/50 sticky top-0 z-50">
         <div className="flex items-center gap-2 sm:gap-3">
@@ -386,29 +386,29 @@ export default function App() {
               className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth"
             >
               {messages.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-4">
-                  <div className="w-20 h-20 bg-teal-600/10 rounded-3xl flex items-center justify-center mb-4">
-                    <MessageSquare size={40} className="text-teal-500" />
+                <div className="min-h-full flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-3 sm:space-y-4 py-4">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-teal-600/10 rounded-2xl sm:rounded-3xl flex items-center justify-center mb-2 sm:mb-4">
+                    <MessageSquare size={32} className="text-teal-500 sm:w-10 sm:h-10" />
                   </div>
-                  <h2 className="text-3xl font-extrabold text-white mb-6">Welcome to TextilePro AI</h2>
-                  <div className="space-y-4">
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-4 sm:mb-6">Welcome to TextilePro AI</h2>
+                  <div className="space-y-3 sm:space-y-4">
                     <AnimatedText 
                       text="Hello! I am TextilePro AI, your personal expert consultant for Textile Engineering and Garments Production."
-                      className="text-lg leading-relaxed"
+                      className="text-base sm:text-lg leading-relaxed"
                     />
                     <AnimatedText 
                       text="I was created by Tasin Ahmed to assist you with everything from spinning, weaving, and dyeing to apparel quality control and costing. How can I help you today?"
-                      className="text-base leading-relaxed"
+                      className="text-sm sm:text-base leading-relaxed"
                       delay={1.5}
                       highlightWords={["Tasin", "Ahmed"]}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3 w-full mt-8">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3 w-full mt-6 sm:mt-8">
                     {['Dyeing Process', 'Fabric Defects', 'Costing Tips', 'Washing Types'].map(tip => (
                       <button 
                         key={tip}
                         onClick={() => handleSendMessage(`Tell me about ${tip}`)}
-                        className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs font-medium hover:bg-teal-600/20 hover:border-teal-500/50 transition-all text-left"
+                        className="p-2 sm:p-3 rounded-xl bg-white/5 border border-white/10 text-[10px] sm:text-xs font-medium hover:bg-teal-600/20 hover:border-teal-500/50 transition-all text-left"
                       >
                         {tip}
                       </button>
