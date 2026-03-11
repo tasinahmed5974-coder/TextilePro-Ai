@@ -1,0 +1,8 @@
+{
+  "name": "TextilePro AI",
+  "description": "Expert AI consultant for the Textile and Garments Industry, providing professional guidance in English and Bangla with image analysis and voice support.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

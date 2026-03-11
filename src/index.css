@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@layer base {
+  .prose {
+    @apply text-slate-200 leading-relaxed;
+  }
+  .prose h1, .prose h2, .prose h3 {
+    @apply font-bold text-white mt-4 mb-2;
+  }
+  .prose p {
+    @apply mb-3;
+  }
+  .prose ul, .prose ol {
+    @apply ml-4 mb-3 list-disc;
+  }
+  .prose li {
+    @apply mb-1;
+  }
+  .prose strong {
+    @apply text-teal-400 font-semibold;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-white/10 rounded-full hover:bg-teal-500/50 transition-colors;
+}
