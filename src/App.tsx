@@ -294,7 +294,16 @@ export default function App() {
   const openCamera = async () => {
     setIsCameraOpen(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      // Simple check for mobile/touch devices
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      const constraints = {
+        video: {
+          facingMode: isMobile ? { ideal: "environment" } : "user"
+        }
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
