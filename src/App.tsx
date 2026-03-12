@@ -19,14 +19,20 @@ import {
   VolumeX,
   Sparkles,
   Plus,
-  ArrowUp
+  ArrowUp,
+  Menu,
+  Trash2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  MessageCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
 import ReactMarkdown from 'react-markdown';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { SYSTEM_INSTRUCTION, Message } from './constants';
+import { SYSTEM_INSTRUCTION, Message, ChatSession } from './constants';
+import { useLiveAPI } from './hooks/useLiveAPI';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -73,6 +79,9 @@ const AnimatedText = ({ text, className, delay = 0, highlightWords = [] }: { tex
 export default function App() {
   const [activeTab, setActiveTab] = useState<'chat' | 'voice'>('chat');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
   const [inputText, setInputText] = useState('');
   const [inputLanguage, setInputLanguage] = useState<'en-US' | 'bn-BD'>('en-US');
   const [isListening, setIsListening] = useState(false);
@@ -89,6 +98,107 @@ export default function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  // Load from local storage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('textilepro_sessions');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setSessions(parsed);
+        if (parsed.length > 0) {
+          setCurrentSessionId(parsed[0].id);
+          setMessages(parsed[0].messages);
+        }
+      } catch (e) {
+        console.error('Failed to parse sessions', e);
+      }
+    }
+  }, []);
+
+  // Sync messages to current session
+  useEffect(() => {
+    if (currentSessionId) {
+      setSessions(prev => {
+        const currentSession = prev.find(s => s.id === currentSessionId);
+        if (currentSession && currentSession.messages === messages) {
+          return prev; // No change in messages reference, don't update
+        }
+        
+        const updated = prev.map(s => {
+          if (s.id === currentSessionId) {
+            let title = s.title;
+            if (title === 'New Chat' && messages.length > 0) {
+              const firstUserMsg = messages.find(m => m.role === 'user');
+              if (firstUserMsg) {
+                const titleText = firstUserMsg.text.replace(/\n/g, ' ').trim();
+                title = titleText ? (titleText.slice(0, 40) + (titleText.length > 40 ? '...' : '')) : 'New Chat';
+              }
+            }
+            return { ...s, messages, title, updatedAt: Date.now() };
+          }
+          return s;
+        });
+        return updated.sort((a, b) => b.updatedAt - a.updatedAt);
+      });
+    } else if (messages.length > 0) {
+      const newSessionId = Date.now().toString();
+      const firstUserMsg = messages.find(m => m.role === 'user');
+      let title = 'New Chat';
+      if (firstUserMsg) {
+        const titleText = firstUserMsg.text.replace(/\n/g, ' ').trim();
+        title = titleText ? (titleText.slice(0, 40) + (titleText.length > 40 ? '...' : '')) : 'New Chat';
+      }
+      
+      const newSession: ChatSession = {
+        id: newSessionId,
+        title,
+        messages,
+        updatedAt: Date.now()
+      };
+      setSessions(prev => [newSession, ...prev].sort((a, b) => b.updatedAt - a.updatedAt));
+      setCurrentSessionId(newSessionId);
+    }
+  }, [messages, currentSessionId]);
+
+  // Save to local storage
+  useEffect(() => {
+    if (sessions.length > 0) {
+      localStorage.setItem('textilepro_sessions', JSON.stringify(sessions));
+    } else {
+      localStorage.removeItem('textilepro_sessions');
+    }
+  }, [sessions]);
+
+  const switchSession = (id: string) => {
+    const session = sessions.find(s => s.id === id);
+    if (session) {
+      setCurrentSessionId(id);
+      setMessages(session.messages);
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      }
+    }
+  };
+
+  const createNewChat = () => {
+    setCurrentSessionId(null);
+    setMessages([]);
+    setInputText('');
+    setPreviewImage(null);
+    setUploadedFile(null);
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  };
+  
+  const deleteSession = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setSessions(prev => prev.filter(s => s.id !== id));
+    if (currentSessionId === id) {
+      createNewChat();
+    }
+  };
 
   const startSpeechToText = () => {
     if (isListening && recognitionRef.current) {
@@ -336,18 +446,116 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-black text-gray-100 font-sans selection:bg-teal-500/30">
-      {/* Navbar */}
-      <nav className="flex items-end justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-white/10 backdrop-blur-md bg-black/50 sticky top-0 z-50">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-teal-600/20 shrink-0">
-            <span className="font-bold text-lg sm:text-xl text-white">T</span>
+    <div className="flex h-full bg-black text-gray-100 font-sans selection:bg-teal-500/30 overflow-hidden">
+      {/* Mobile Sidebar Overlay */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarOpen(false)}
+            className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Sidebar */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.aside 
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 280, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+            className="fixed md:relative top-0 left-0 h-full bg-[#0a0a0a] border-r border-white/10 flex flex-col shrink-0 z-50 overflow-hidden"
+          >
+            <div className="w-[280px] flex flex-col h-full">
+              <div className="p-4 flex items-center justify-between border-b border-white/10 shrink-0">
+                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                  <MessageSquare size={14} className="text-teal-500 -ml-1" />
+                  Chat History
+                </h2>
+                <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-1.5 rounded-lg hover:bg-white/10 text-gray-400">
+                  <X size={16} />
+                </button>
+                <button onClick={() => setIsSidebarOpen(false)} className="hidden md:block p-1.5 rounded-lg hover:bg-white/10 text-gray-400">
+                  <PanelLeftClose size={16} />
+                </button>
+              </div>
+              
+              <div className="p-3 shrink-0">
+                <button
+                  onClick={createNewChat}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 bg-teal-600/10 hover:bg-teal-600/20 text-teal-400 border border-teal-500/30 rounded-xl transition-all duration-300 text-sm font-medium"
+                >
+                  <Plus size={16} />
+                  New Chat
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
+                {sessions.length === 0 ? (
+                  <div className="text-center text-gray-500 text-xs py-8">
+                    No chat history yet
+                  </div>
+                ) : (
+                  sessions.map(session => (
+                    <div 
+                      key={session.id}
+                      onClick={() => switchSession(session.id)}
+                      className={cn(
+                        "group flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-all duration-200",
+                        currentSessionId === session.id 
+                          ? "bg-teal-600/20 text-teal-300" 
+                          : "hover:bg-white/5 text-gray-300 hover:text-white"
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 overflow-hidden">
+                        <MessageCircle size={14} className={currentSessionId === session.id ? "text-teal-400 shrink-0" : "text-gray-500 group-hover:text-gray-400 shrink-0"} />
+                        <div className="flex flex-col overflow-hidden">
+                          <span className="text-sm truncate font-medium">{session.title}</span>
+                          <span className="text-[10px] text-gray-500 truncate">
+                            {new Date(session.updatedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={(e) => deleteSession(e, session.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-all shrink-0"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      <div className="flex-1 flex flex-col h-full min-w-0 relative">
+        {/* Navbar */}
+        <nav className="flex items-end justify-between px-3 sm:px-6 py-3 sm:py-4 border-b border-white/10 backdrop-blur-md bg-black/50 sticky top-0 z-40">
+          <div className="flex items-center gap-1.5 sm:gap-3">
+            {!isSidebarOpen && (
+              <button 
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-1.5 -ml-2 sm:-ml-1.5 rounded-xl hover:bg-white/10 text-gray-400 hover:text-white transition-colors mr-0.5 sm:mr-1"
+              >
+                <Menu size={16} className="md:hidden" />
+                <PanelLeftOpen size={18} className="hidden md:block" />
+              </button>
+            )}
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-teal-600/20 shrink-0">
+              <span className="font-bold text-lg sm:text-xl text-white">T</span>
+            </div>
+            <div className="flex flex-col justify-center">
+              <h1 className="font-bold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">TextilePro AI</h1>
+              <p className="text-[8px] sm:text-[10px] uppercase tracking-widest text-teal-400 font-semibold leading-none mt-0.5">Expert Consultant</p>
+            </div>
           </div>
-          <div className="flex flex-col justify-center">
-            <h1 className="font-bold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">TextilePro AI</h1>
-            <p className="text-[8px] sm:text-[10px] uppercase tracking-widest text-teal-400 font-semibold leading-none mt-0.5">Expert Consultant</p>
-          </div>
-        </div>
         <div className="flex items-center gap-2 sm:gap-4">
           <div className="flex bg-white/5 p-0.5 sm:p-1 rounded-full border border-white/10 mb-0.5 sm:mb-0">
             <button 
@@ -372,12 +580,7 @@ export default function App() {
             </button>
           </div>
           <button
-            onClick={() => {
-              setMessages([]);
-              setInputText('');
-              setPreviewImage(null);
-              setUploadedFile(null);
-            }}
+            onClick={createNewChat}
             className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-teal-600/10 hover:bg-teal-600/20 text-teal-400 border border-teal-500/30 rounded-full transition-all duration-300 text-[11px] sm:text-sm font-medium"
           >
             <Plus size={14} className="sm:w-4 sm:h-4" />
@@ -700,6 +903,7 @@ export default function App() {
           <VoiceInterface />
         )}
       </main>
+      </div>
 
       {/* Camera Modal */}
       <AnimatePresence>
@@ -739,8 +943,6 @@ export default function App() {
     </div>
   );
 }
-
-import { useLiveAPI } from './hooks/useLiveAPI';
 
 function VoiceInterface() {
   const { isConnected, isConnecting, error, voiceName, setVoiceName, connect, disconnect } = useLiveAPI();
