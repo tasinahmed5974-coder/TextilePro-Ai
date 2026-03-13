@@ -219,7 +219,7 @@ export default function App() {
     recognition.continuous = true;
     recognition.interimResults = true;
 
-    let lastRecognized = '';
+    let lastInterim = '';
 
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
@@ -232,26 +232,36 @@ export default function App() {
     };
 
     recognition.onresult = (event: any) => {
-      let currentSessionTranscript = '';
+      let finalTranscript = '';
+      let interimTranscript = '';
       
-      for (let i = 0; i < event.results.length; ++i) {
-        currentSessionTranscript += event.results[i][0].transcript;
+      // Iterate only through the new results
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
       }
       
-      const cleanSessionText = currentSessionTranscript.replace(/\s+/g, ' ').trim();
-      
-      setInputText((prevText) => {
-        let baseText = prevText;
-        
-        if (lastRecognized && baseText.endsWith(lastRecognized)) {
-          baseText = baseText.slice(0, -lastRecognized.length);
+      setInputText(prev => {
+        let baseText = prev;
+        // Remove the previous interim text if it exists
+        if (lastInterim && baseText.endsWith(lastInterim)) {
+            baseText = baseText.slice(0, -lastInterim.length).trim();
         }
         
-        const separator = baseText && !baseText.endsWith(' ') && cleanSessionText ? ' ' : '';
-        const newRecognized = cleanSessionText ? separator + cleanSessionText : '';
+        // Append final transcript
+        if (finalTranscript) {
+            baseText = baseText + (baseText ? ' ' : '') + finalTranscript.trim();
+            // If we have a final transcript, the interim is effectively gone/integrated.
+            lastInterim = '';
+        } else {
+            // Update interim text
+            lastInterim = interimTranscript;
+        }
         
-        lastRecognized = newRecognized;
-        return baseText + newRecognized;
+        return (baseText + (baseText && lastInterim ? ' ' : '') + lastInterim).trim();
       });
     };
 
